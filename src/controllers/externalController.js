@@ -1,8 +1,12 @@
 const pool = require('../config/db');
 
-const poblarProductos = async (request, response) => {
+
+// =====================================================
+// CARGA MASIVA DESDE API EXTERNA
+// =====================================================
+const poblarProductos = async (req, res) => {
     try {
-       
+
         const apiFetch = await fetch('https://fakestoreapi.com/products');
         const products = await apiFetch.json();
 
@@ -20,9 +24,7 @@ const poblarProductos = async (request, response) => {
 
             const stock = Math.floor(Math.random() * 50) + 1;
 
-            // ===============================
-            // 1. Buscar si ya existe categoría
-            // ===============================
+            // Buscar categoría
             const buscarCategoria = `
                 SELECT id FROM categoria
                 WHERE nombre = $1
@@ -35,9 +37,7 @@ const poblarProductos = async (request, response) => {
 
             let idCategoria;
 
-            // ===============================
-            // 2. Si no existe → crearla
-            // ===============================
+            // Crear si no existe
             if (categoriaResult.rows.length === 0) {
 
                 const insertarCategoria = `
@@ -54,13 +54,10 @@ const poblarProductos = async (request, response) => {
                 idCategoria = nuevaCategoria.rows[0].id;
 
             } else {
-                // Ya existe
                 idCategoria = categoriaResult.rows[0].id;
             }
 
-            // ===============================
-            // 3. Insertar producto
-            // ===============================
+            // Insertar producto
             const insertarProducto = `
                 INSERT INTO productos
                 (nombre, precio, stock, descripcion, imagen_url, id_categoria)
@@ -79,65 +76,124 @@ const poblarProductos = async (request, response) => {
             inserciones++;
         }
 
-        response.status(200).json({
+        res.status(200).json({
             mensaje: "Carga masiva exitosa",
             cantidad: inserciones
         });
 
     } catch (error) {
-        console.error("Error:", error);
-        response.status(500).json({
-            error: error.message
-        });
+        console.error(error);
+        res.status(500).json({ error: error.message });
     }
 };
+
+
+// =====================================================
+// OBTENER PRODUCTOS (búsqueda opcional ?q=)
+// =====================================================
 const getProductos = async (req, res) => {
-  try {
+    try {
 
-    const { q } = req.query;
+        const { q } = req.query;
 
-    if (!q || q.trim() === "") {
-      return res.status(400).json({
-        error: "Debes enviar un parámetro de búsqueda: ?q=palabra"
-      });
+        let query = `
+            SELECT p.*, c.nombre AS categoria
+            FROM productos p
+            JOIN categoria c ON p.id_categoria = c.id
+        `;
+
+        let params = [];
+
+        if (q && q.trim() !== "") {
+            query += " WHERE p.nombre ILIKE $1";
+            params.push(`%${q}%`);
+        }
+
+        const { rows } = await pool.query(query, params);
+
+        res.json(rows);
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error al leer BD" });
     }
-
-    let sql = "SELECT * FROM productos WHERE nombre ILIKE $1";
-    let values = [`%${q}%`];
-
-    const result = await pool.query(sql, values);
-
-    res.json(result.rows);
-
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Error al leer BD' });
-  }
 };
+
+
+// =====================================================
+// OBTENER CATEGORÍAS (?k=)
+// =====================================================
 const getCategoria = async (req, res) => {
+    try {
+
+        const { k } = req.query;
+
+        if (!k || k.trim() === "") {
+            return res.status(400).json({
+                error: "Debes enviar un parámetro de búsqueda: ?k=palabra"
+            });
+        }
+
+        const sql = `
+            SELECT * FROM categoria
+            WHERE nombre ILIKE $1
+        `;
+
+        const result = await pool.query(sql, [`%${k}%`]);
+
+        res.json(result.rows);
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error al leer BD" });
+    }
+};
+
+
+const crearProducto = async (request, response) => {
+  const { nombre, precio, stock, descripcion, image_url, id_categoria } = request.body;
+
   try {
 
-    const { k } = req.query;
-
-    if (!k || k.trim() === "") {
-      return res.status(400).json({
-        error: "Debes enviar un parámetro de búsqueda: ?q=palabra"
+    if (!nombre || !precio || !stock || !id_categoria) {
+      return response.status(400).json({
+        error: "Faltan campos obligatorios"
       });
     }
 
-    let sql = "SELECT * FROM categoria WHERE nombre ILIKE $1";
-    let values = [`%${k}%`];
+    const categoriaExiste = await pool.query(
+      "SELECT id FROM categoria WHERE id = $1",
+      [id_categoria]
+    );
 
-    const result = await pool.query(sql, values);
+    if (categoriaExiste.rows.length === 0) {
+      return response.status(400).json({
+        error: "La categoría no existe"
+      });
+    }
 
-    res.json(result.rows);
+    const result = await pool.query(
+      `INSERT INTO productos 
+       (nombre, precio, stock, descripcion, image_url, id_categoria) 
+       VALUES ($1, $2, $3, $4, $5, $6) 
+       RETURNING id`,
+      [nombre, precio, stock, descripcion, image_url, id_categoria]
+    );
+
+    response.status(201).json({
+      message: "Producto creado correctamente",
+      id: result.rows[0].id
+    });
 
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Error al leer BD' });
+     response.status(500).json({ error: error.message });
   }
 };
 
 
-
-module.exports = { poblarProductos, getProductos, getCategoria };
+module.exports = {
+    poblarProductos,
+    getProductos,
+    getCategoria,
+    crearProducto
+};
