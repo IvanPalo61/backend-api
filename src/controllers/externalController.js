@@ -83,7 +83,7 @@ const poblarProductos = async (req, res) => {
 
     } catch (error) {
         console.error(error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ message: error.message });
     }
 };
 
@@ -115,7 +115,7 @@ const getProductos = async (req, res) => {
 
     } catch (error) {
         console.error(error);
-        res.status(500).json({ error: "Error al leer BD" });
+        res.status(500).json({ message: "Error al leer BD" });
     }
 };
 
@@ -130,7 +130,7 @@ const getCategoria = async (req, res) => {
 
         if (!k || k.trim() === "") {
             return res.status(400).json({
-                error: "Debes enviar un parámetro de búsqueda: ?k=palabra"
+                message: "Debes enviar un parámetro de búsqueda: ?k=palabra"
             });
         }
 
@@ -145,49 +145,74 @@ const getCategoria = async (req, res) => {
 
     } catch (error) {
         console.error(error);
-        res.status(500).json({ error: "Error al leer BD" });
+        res.status(500).json({ message: "Error al leer BD" });
     }
 };
 
 
-const crearProducto = async (request, response) => {
-  const { nombre, precio, stock, descripcion, image_url, id_categoria } = request.body;
+// =====================================================
+// CREAR PRODUCTO (CORREGIDO)
+// Compatible con tu frontend
+// =====================================================
+const crearProducto = async (req, res) => {
+    const { nombre, precio, categoria, descripcion, imagen_url } = req.body;
 
-  try {
+    try {
 
-    if (!nombre || !precio || !stock || !id_categoria) {
-      return response.status(400).json({
-        error: "Faltan campos obligatorios"
-      });
+        // Validación básica
+        if (!nombre || !precio || !categoria) {
+            return res.status(400).json({
+                message: "Nombre, precio y categoría son obligatorios"
+            });
+        }
+
+        // Buscar si la categoría existe
+        let categoriaResult = await pool.query(
+            "SELECT id FROM categoria WHERE nombre ILIKE $1",
+            [categoria.trim()]
+        );
+
+        let idCategoria;
+
+        // Si no existe, crearla automáticamente
+        if (categoriaResult.rows.length === 0) {
+
+            const nuevaCategoria = await pool.query(
+                "INSERT INTO categoria (nombre) VALUES ($1) RETURNING id",
+                [categoria.trim()]
+            );
+
+            idCategoria = nuevaCategoria.rows[0].id;
+
+        } else {
+            idCategoria = categoriaResult.rows[0].id;
+        }
+
+        // Insertar producto
+        const result = await pool.query(
+            `INSERT INTO productos 
+            (nombre, precio, stock, descripcion, imagen_url, id_categoria) 
+            VALUES ($1, $2, $3, $4, $5, $6) 
+            RETURNING id`,
+            [
+                nombre.trim(),
+                precio,
+                0, // stock por defecto
+                descripcion || "",
+                imagen_url || "",
+                idCategoria
+            ]
+        );
+
+        res.status(201).json({
+            message: "Producto creado correctamente",
+            id: result.rows[0].id
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: error.message });
     }
-
-    const categoriaExiste = await pool.query(
-      "SELECT id FROM categoria WHERE id = $1",
-      [id_categoria]
-    );
-
-    if (categoriaExiste.rows.length === 0) {
-      return response.status(400).json({
-        error: "La categoría no existe"
-      });
-    }
-
-    const result = await pool.query(
-      `INSERT INTO productos 
-       (nombre, precio, stock, descripcion, image_url, id_categoria) 
-       VALUES ($1, $2, $3, $4, $5, $6) 
-       RETURNING id`,
-      [nombre, precio, stock, descripcion, image_url, id_categoria]
-    );
-
-    response.status(201).json({
-      message: "Producto creado correctamente",
-      id: result.rows[0].id
-    });
-
-  } catch (error) {
-     response.status(500).json({ error: error.message });
-  }
 };
 
 
