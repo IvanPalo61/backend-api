@@ -1,9 +1,5 @@
 const pool = require('../config/db');
 
-
-// =====================================================
-// CARGA MASIVA DESDE API EXTERNA
-// =====================================================
 const poblarProductos = async (req, res) => {
     try {
 
@@ -89,7 +85,7 @@ const poblarProductos = async (req, res) => {
 
 
 // =====================================================
-// OBTENER PRODUCTOS (búsqueda opcional ?q=)
+// OBTENER PRODUCTOS
 // =====================================================
 const getProductos = async (req, res) => {
     try {
@@ -121,7 +117,7 @@ const getProductos = async (req, res) => {
 
 
 // =====================================================
-// OBTENER CATEGORÍAS (?k=)
+// OBTENER CATEGORÍAS
 // =====================================================
 const getCategoria = async (req, res) => {
     try {
@@ -151,11 +147,10 @@ const getCategoria = async (req, res) => {
 
 
 // =====================================================
-// CREAR PRODUCTO (CORREGIDO)
-// Compatible con tu frontend
+// CREAR PRODUCTO (ARREGLADO)
 // =====================================================
 const crearProducto = async (req, res) => {
-    const { nombre, precio, categoria, descripcion, imagen_url } = req.body;
+    const { nombre, precio, categoria, descripcion, imagen_url, youtube_url } = req.body;
 
     try {
 
@@ -166,7 +161,7 @@ const crearProducto = async (req, res) => {
             });
         }
 
-        // Buscar si la categoría existe
+        // Buscar o crear categoría
         let categoriaResult = await pool.query(
             "SELECT id FROM categoria WHERE nombre ILIKE $1",
             [categoria.trim()]
@@ -174,9 +169,7 @@ const crearProducto = async (req, res) => {
 
         let idCategoria;
 
-        // Si no existe, crearla automáticamente
         if (categoriaResult.rows.length === 0) {
-
             const nuevaCategoria = await pool.query(
                 "INSERT INTO categoria (nombre) VALUES ($1) RETURNING id",
                 [categoria.trim()]
@@ -191,16 +184,17 @@ const crearProducto = async (req, res) => {
         // Insertar producto
         const result = await pool.query(
             `INSERT INTO productos 
-            (nombre, precio, stock, descripcion, imagen_url, id_categoria) 
-            VALUES ($1, $2, $3, $4, $5, $6) 
+            (nombre, precio, stock, descripcion, imagen_url, id_categoria, youtube_url) 
+            VALUES ($1, $2, $3, $4, $5, $6, $7) 
             RETURNING id`,
             [
                 nombre.trim(),
                 precio,
-                0, // stock por defecto
+                0,
                 descripcion || "",
                 imagen_url || "",
-                idCategoria
+                idCategoria,
+                youtube_url || ""
             ]
         );
 

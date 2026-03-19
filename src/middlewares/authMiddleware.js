@@ -7,7 +7,7 @@ module.exports = (req, res, next) => {
     }
 
     try {
-        // Limpiamos "Bearer " con espacio incluido
+       
         const token = authHeader.replace(/^Bearer\s+/i, '');
         
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
