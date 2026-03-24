@@ -150,7 +150,7 @@ const getCategoria = async (req, res) => {
 // CREAR PRODUCTO (ARREGLADO)
 // =====================================================
 const crearProducto = async (req, res) => {
-    const { nombre, precio, categoria, descripcion, imagen_url, youtube_url } = req.body;
+    const { nombre, precio, categoria, descripcion, imagen_url, youtube_url, latitud,longitud } = req.body;
 
     try {
 
@@ -184,8 +184,8 @@ const crearProducto = async (req, res) => {
         // Insertar producto
         const result = await pool.query(
             `INSERT INTO productos 
-            (nombre, precio, stock, descripcion, imagen_url, id_categoria, youtube_url) 
-            VALUES ($1, $2, $3, $4, $5, $6, $7) 
+            (nombre, precio, stock, descripcion, imagen_url, id_categoria, youtube_url, latitud, longitud) 
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) 
             RETURNING id`,
             [
                 nombre.trim(),
@@ -194,8 +194,10 @@ const crearProducto = async (req, res) => {
                 descripcion || "",
                 imagen_url || "",
                 idCategoria,
-                youtube_url || ""
-            ]
+                youtube_url || "",
+                latitud || "",
+                longitud || ""
+            ] 
         );
 
         res.status(201).json({
