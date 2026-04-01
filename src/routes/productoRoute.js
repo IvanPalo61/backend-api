@@ -15,7 +15,7 @@ const router = express.Router();
 router.post('/poblar', poblarProductos);
 
 // Cambiar de '/productos' a '/'
-router.get('/', getProductos);
+router.get('/productos', getProductos);
 
 router.get('/categoria', getCategoria);
 router.post('/crear', authMiddleware, crearProducto);
